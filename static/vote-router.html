@@ -1,0 +1,364 @@
+<!--
+ * @Author: your name
+ * @Date: 2019-11-14 16:58:04
+ * @LastEditTime: 2019-11-16 11:02:42
+ * @LastEditors: Please set LastEditors
+ * @Description: In User Settings Edit
+ * @FilePath: \Vote\static\vote-router.html
+ -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+</head>
+<body>
+    <div id="app">
+        <router-view></router-view>
+    </div>
+
+<script src="./assets/vue.js"></script>
+<script src="./assets/vue-router.js"></script>
+<script src="./assets/lodash.js"></script>
+<script src="./assets/axios.min.js"></script>
+<script src="/socket.io/socket.io.js"></script>
+
+<script>
+
+var api = axios.create({
+    baseURL: 'http://localhost:3005'
+})
+
+var Profile = {
+    template: `
+    <div>
+        <div v-if="user">
+            <div>
+                <span>欢迎， {{user.name}}</span>
+                <img :src="user.avatar">
+            </div>
+            <div>
+                <router-link to="/create-vote">创建投票</router-link>
+                <button @click="logout">退出</button>
+            </div>
+        </div>
+        <div v-else>
+            <router-link to="/login">登录</router-link>
+            <router-link to="/register">注册</router-link>
+        </div>
+    </div>
+    `,
+    async mounted(){
+        try {
+          var response = await api.get('/userinfo')
+          this.user = response.data
+          
+        } catch(e) {
+          // this.$router.push('/login')
+        }
+    },
+    data(){
+        return {
+            user: null,
+        }
+    },
+    methods: {
+        async logout(){
+            await api.get('/logout');
+            this.user = null
+        }
+    },
+}
+var Login = {
+    template: `
+        <div>
+            <div>用户名：<input type="text" v-model="loginInfo.name" /></div>
+            <div>密码：<input type="password" v-model="loginInfo.password" /></div>
+            <div>验证码：<input type="text" v-model="loginInfo.captcha" /></br>
+                <img :src="captchaUrl" @click="updateCaptcha" />
+            </div>
+            <div><router-link to="/forgot">忘记密码</router-link></div>
+            <div><button @click="login">登录</button></div>
+        </div>
+    `,
+    data(){
+        return {
+            captchaUrl: "http://localhost:3005/captcha?" + Date.now(),
+            loginInfo: {
+                name: "",
+                password: "",
+                captcha: "",
+            }
+        }
+    },
+    methods: {
+        async login(){
+            var request = await api.post('/login', this.loginInfo)
+            var data = request.data
+            if(data.code == 1){
+                this.$router.push('/');
+            }else if(data.code == 0){
+                alert("验证码错误！")
+            }else if(data.code == -1){
+                alert("用户名或密码错误！")
+            }
+        },
+        updateCaptcha(){
+            this.captchaUrl = "http://localhost:3005/captcha?" + Date.now();
+        }
+    }
+}
+var Register = {
+    template: `
+        <div>
+            <div>用户名：<input type="text" v-model="name" /></div>
+            <div>邮箱：<input type="text" v-model="email" /></div>
+            <div>密码：<input type="password" v-model="password" /></div>
+            <div>头像：<input type="file" @change="getFile($event)" /></div>
+            <div><button @click="register($event)">注册</button></div>
+        </div>
+    `,
+    data(){
+        return {
+            name: "",
+            email: "",
+            password: "",
+            avatar: "",
+        }
+    },
+    methods:{
+        getFile(event){
+            this.avatar = event.target.files[0]
+        },
+        async register(event){
+            try{
+                event.preventDefault()
+                let formData = new FormData()
+                formData.append('name', this.name);
+                formData.append('email', this.email);
+                formData.append('password', this.password);
+                formData.append('avatar', this.avatar);
+                await api.post('/register', formData);
+                this.$router.push("/");
+            }catch(e){
+                alert(e.response.data.msg);
+            }
+        }
+    }
+}
+
+var CreateVote = {
+    template: `
+        <div>
+            <h1>创建投票</h1>
+            <div>标题：<input type="text" v-model='voteInfo.title'></div>
+            <div>描述：<input type="text" v-model="voteInfo.desc"></div>
+            <div v-for="(option, idx) of voteInfo.options">
+                <input type="text" v-model="voteInfo.options[idx]" :placeholder="'选项' + (idx + 1)" />
+                <button @click="voteInfo.options.splice(idx, 1)">-</button>
+            </div>
+            <button @click="voteInfo.options.push('')">添加选项</button>
+            <div>截止时间：<input type="datetime-local" v-model="voteInfo.deadline"></div>
+            <div>
+                <label><input type="radio" value="0" v-model="voteInfo.anonymouse">实名</label>
+                <label><input type="radio" value="1" v-model="voteInfo.anonymouse">匿名</label>
+            </div>
+            <div>
+                <select v-model="voteInfo.singleSelection">
+                    <option value="1">单选</option>
+                    <option value="0">多选</option>
+                </select>
+            </div>
+            <button @click="submit">提交</button>
+        </div>
+    `,
+    data() {
+        return {
+            voteInfo: {
+                title: '',
+                desc: '',
+                options: ["", ""],
+                deadline: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
+                anonymouse: "0",
+                singleSelection: '1',
+            }
+        }
+    },
+    methods: {
+        async submit() {
+            var request = await axios.post('/vote', this.voteInfo)
+            var data = request.data
+            this.$router.push('/vote-show/' + data.id);
+        }
+    }
+}
+
+
+
+var VoteView = {
+    template: `
+        <div>
+            <div>
+                <h1>{{ vote.info.title }}</h1>
+                <h3>{{ vote.info.desc }}</h3>
+            </div>
+            <ul class="options">
+                <li @click="voteup(option.id)" v-for="option in vote.options">{{ option.content }} - {{summery[option.id].length }}票
+                    <div class="ratio" style="height: 3px; background: red;" :style="{width: ratioSummer[option.id] * 100 + '%'}"></div>
+                </li>
+            </ul>
+        </div>
+    `,
+    async mounted(){
+        this.init();
+    },
+    data() {
+        return {
+            vote: {
+                info: {},
+                options: [],
+                voteups: {}
+            },
+        }
+    },
+    watch: {
+        $route(to, from){
+            this.init();
+        }
+    },
+    methods: {
+        async init(){
+            var id = this.$route.params.id;
+            var request = await api.get('/vote/' + id)
+            var data = request.data;
+            console.log(data);
+            this.vote = data
+            this.vote.voteups = _.uniqBy(this.vote.voteups, 'userid');
+
+            this.socket = io();
+            this.socket.emit('select room', id)
+
+            this.socket.on('new vote', data => {
+                this.vote.voteups = this.vote.voteups.filter(it => it.userid != data.userid)
+                this.vote.voteups.push(data)
+            })
+        },
+        voteup(optionid){
+            axios.post('/voteup', {
+                optionid,
+                voteid: this.vote.info.id,
+            })
+        }
+    },
+    computed: {
+        summery(){
+            var obj = _.mapValues(_.keyBy(this.vote.options, 'id'), () => [])
+
+            return {
+                ...obj,
+                ..._.groupBy(this.vote.voteups, 'optionid')
+            }
+        },
+        ratioSummer(){
+            return _.mapValues(this.summery, (voteups, voteid) => {
+                if(voteups.length == 0){
+                    return 0
+                }
+                return voteups.length / this.vote.voteups.length
+            })
+        },
+    }
+}
+
+var Forgot = {
+    template: `
+        <div>
+            请输入您的邮箱：<input typt="text" v-model="email"/>
+            <button @click="comfile">确定</button>
+        </div>
+    `,
+    data(){
+        return {
+            email: ""
+        }
+    },
+    methods:{
+        async comfile(){
+            var response = await api.post('/forgot', {email: this.email});
+            alert(response.data.msg);
+        }
+    }
+}
+
+var ChangePassword = {
+    template: `
+        <div>
+            <h2>请重置您的密码<h2>
+            <input type="password" v-model="password"/>
+            <button @click="confirm">确认</button>
+        </div>
+    `,
+    data(){
+        return {
+            password: "",
+        }
+    },
+    async mounted(){
+        this.init();
+    },
+    methods: {
+        async init(){
+            var token = this.$route.params.token;
+            var request = await api.get('/change-password/' + token)
+        },
+        async confirm(){
+            var token = this.$route.params.token;
+            var response = await api.post('/change-password/' + token, {password: this.password});
+            if(response.data.code == 0){
+                this.$router.push("/")
+            }else{
+                alert(response.data.msg);
+            }
+        }
+    }
+}
+
+var router = new VueRouter({
+    routes: [{
+        path: "/",
+        component: Profile
+    },{
+        path: "/login",
+        component: Login
+    },{
+        path: "/create-vote",
+        component: CreateVote
+    },{
+        path: "/vote-show/:id",
+        component: VoteView
+    },{
+        path: "/register",
+        component: Register
+    },{
+        path: "/forgot",
+        component: Forgot
+    },{
+        path: "/change-password/:token",
+        component: ChangePassword
+    }]
+})
+
+
+var app = new Vue({
+    router: router,
+    el: '#app',
+    data: {
+        
+    }
+})
+</script>
+
+</body>
+</html>

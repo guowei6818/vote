@@ -1,0 +1,12 @@
+extends layout.pug
+
+
+block content
+    div
+        span Welcome, #{user.name}
+        img(src="/" + user.avatar)
+
+    div
+        a(href="/create-vue.html") 创建投票
+        span    
+        a(href="/logout") 退出
