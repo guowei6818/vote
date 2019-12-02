@@ -1,7 +1,7 @@
 /*
  * @Author: your name
  * @Date: 2019-10-29 22:14:53
- * @LastEditTime: 2019-11-30 22:10:08
+ * @LastEditTime: 2019-12-01 21:53:28
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \Vote\app.js
@@ -135,6 +135,7 @@ app.post('/voteup', async (req, res, next) => {
     var userid = req.signedCookies.userid;
     var voteid = body.voteid;
     var vote = await db.get('SELECT * FROM votes WHERE id=?', voteid);
+    var {avatar} = await db.get('SELECT avatar FROM users WHERE id=?', userid);
 
     var voteupInfo = await db.get('SELECT * FROM voteups WHERE userid=? AND voteid=?', userid, body.voteid);
     if(!userid){
@@ -158,6 +159,7 @@ app.post('/voteup', async (req, res, next) => {
         }
     }
     ioServer.in(`/vote/${voteid}`).emit('new vote', {
+        avatar,
         userid,
         voteid,
         optionid: body.optionid,

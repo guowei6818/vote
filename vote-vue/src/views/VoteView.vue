@@ -1,7 +1,7 @@
 <!--
  * @Author: your name
  * @Date: 2019-11-16 14:55:09
- * @LastEditTime: 2019-11-30 22:00:40
+ * @LastEditTime: 2019-12-02 09:24:51
  * @LastEditors: Please set LastEditors
  * @Description: In User Settings Edit
  * @FilePath: \Vote\vote\src\components\HelloWorld.vue
@@ -20,9 +20,11 @@
 				<div class="ratio"
 					:style="{width: ratioSummer[option.id] * 100 + '%'}"
 				></div>
-				<div v-show="showDetail" class="show-avatar">
-					<el-avatar shape="circle" size="mini" fit="contain" v-for="(msg, idx) in vote.voteups" :key="idx" :src="getAvatar"></el-avatar>
-				</div>
+				<transition name="slide-fade">
+					<div v-show="showDetail" class="show-avatar">
+						<el-avatar shape="circle" :size="32" fit="contain" v-for="msg in avatarGroup[option.id]" :key="msg.userid" :src="getAvatar(msg)"></el-avatar>
+					</div>
+				</transition>
 			</li>
 		</ul>
 		<div class="show-detail" @click="show">显示详情</div>
@@ -50,6 +52,7 @@ export default {
 				options: [],
 				voteups: [],
 			},
+			avatarGroup: [],
 			showDetail: false
 		}
 	},
@@ -64,12 +67,14 @@ export default {
 			var request = await api.get('/vote/' + id);
 			this.vote = request.data;
 			this.vote.voteups = _.uniqBy(this.vote.voteups, 'userid');
-			console.log(this.vote.voteups);
+			this.avatarGroup = _.groupBy(this.vote.voteups, 'optionid');
+
 			this.socket = io(baseURL);
 			this.socket.emit('select room', id)
 			this.socket.on('new vote', data => {
 				this.vote.voteups = this.vote.voteups.filter(it => it.userid != data.userid)
 				this.vote.voteups.push(data)
+				this.avatarGroup = _.groupBy(this.vote.voteups, 'optionid');
 			});
 		},
 		voteup(optionid){
@@ -81,9 +86,8 @@ export default {
 				voteid: this.vote.info.id,
 			});
 		},
-		getAvatar(id){
-			console.log(id)
-			return baseURL + id.avater;
+		getAvatar(msg){
+			return baseURL  + msg.avatar;
 		},
 		show(event){
 			if(!this.showDetail){
@@ -136,6 +140,7 @@ h2
 .options li
 	height 30px
 	padding 10px 20px
+	margin-bottom 35px
 .ratio
 	transition .5s
 	position absolute
@@ -150,10 +155,12 @@ h2
 	box-shadow 0 2px 4px 0 rgba(0,0,0,.12), 0 0 6px 0 rgba(0,0,0,.04)
 	position relative
 .item-right
-	margin-left 320px
+	position absolute
+	top 18px
+	left 395px
 .show-avatar
 	position absolute
-	bottom -50px
+	bottom -37px
 	left 30px
 .show-detail
 	margin 35px auto
@@ -166,4 +173,12 @@ h2
 	line-height 40px
 	color #409EFF
 	cursor pointer
+.slide-fade-enter-active 
+	transition all .3s ease
+.slide-fade-leave-active 
+	transition all .8s cubic-bezier(1.0, 0.5, 0.8, 1.0)
+.slide-fade-enter, .slide-fade-leave-to
+	transform translateY(10px)
+	opacity 0
+
 </style>
